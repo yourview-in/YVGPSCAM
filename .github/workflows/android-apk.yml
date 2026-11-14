@@ -40,7 +40,7 @@ jobs:
           echo "=== SHA-1 FINGERPRINT ==="
           keytool -list -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android | grep "SHA1:"
 
-      - name: Inject API keys & default_web_client_id
+      - name: Inject API keys & generate matching google-services.json
         env:
           WEB_CLIENT_ID: ${{ secrets.WEB_CLIENT_ID }}
           GOOGLE_DRIVE_API_KEY: ${{ secrets.GOOGLE_DRIVE_API_KEY }}
@@ -49,26 +49,50 @@ jobs:
         run: |
           CLIENT_ID="${WEB_CLIENT_ID}"
           if [ -z "$CLIENT_ID" ]; then CLIENT_ID="://googleusercontent.com"; fi
+          PROJECT_NUM=$(echo "$CLIENT_ID" | cut -d'-' -f1)
 
-          DRIVE_KEY="${GOOGLE_DRIVE_API_KEY}"
-          if [ -z "$DRIVE_KEY" ]; then DRIVE_KEY="placeholder"; fi
-
-          GEMINI_KEY="${GEMINI_API_KEY}"
-          if [ -z "$GEMINI_KEY" ]; then GEMINI_KEY="placeholder"; fi
-
-          MAPS_KEY="${MAPS_API_KEY}"
-          if [ -z "$MAPS_KEY" ]; then MAPS_KEY="placeholder"; fi
+          DRIVE_KEY="${GOOGLE_DRIVE_API_KEY:-placeholder}"
+          GEMINI_KEY="${GEMINI_API_KEY:-placeholder}"
+          MAPS_KEY="${MAPS_API_KEY:-placeholder}"
 
           printf "GOOGLE_DRIVE_API_KEY=%s\n" "$DRIVE_KEY" >> local.properties
           printf "GEMINI_API_KEY=%s\n" "$GEMINI_KEY" >> local.properties
           printf "MAPS_API_KEY=%s\n" "$MAPS_KEY" >> local.properties
 
-          printf "GOOGLE_DRIVE_API_KEY=%s\n" "$DRIVE_KEY" >> .env
-          printf "GEMINI_API_KEY=%s\n" "$GEMINI_KEY" >> .env
-          printf "MAPS_API_KEY=%s\n" "$MAPS_KEY" >> .env
+          printf "GOOGLE_DRIVE_API_KEY=%s\n" "$DRIVE_KEY" > secrets.properties
+          printf "GEMINI_API_KEY=%s\n" "$GEMINI_KEY" >> secrets.properties
+          printf "MAPS_API_KEY=%s\n" "$MAPS_KEY" >> secrets.properties
 
-          mkdir -p app/src/main/res/values
-          printf '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="default_web_client_id" translatable="false">%s</string>\n    <string name="google_drive_api_key" translatable="false">%s</string>\n    <string name="gemini_api_key" translatable="false">%s</string>\n    <string name="google_maps_key" translatable="false">%s</string>\n</resources>\n' "$CLIENT_ID" "$DRIVE_KEY" "$GEMINI_KEY" "$MAPS_KEY" > app/src/main/res/values/ci_secrets.xml
+          cat << EOF > app/google-services.json
+          {
+            "project_info": {
+              "project_number": "$PROJECT_NUM",
+              "project_id": "yvgpscam-$PROJECT_NUM"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:$PROJECT_NUM:android:0000000000000000",
+                  "android_client_info": {
+                    "package_name": "com.aistudio.yvgpscam.k7m4xp"
+                  }
+                },
+                "oauth_client": [
+                  {
+                    "client_id": "$CLIENT_ID",
+                    "client_type": 3
+                  }
+                ],
+                "api_key": [
+                  {
+                    "current_key": "$DRIVE_KEY"
+                  }
+                ]
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
 
       - name: Auto-increment App Version
         run: |
