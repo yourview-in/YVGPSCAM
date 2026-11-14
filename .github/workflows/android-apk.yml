@@ -21,14 +21,26 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Generate missing debug.keystore
+      - name: Setup debug.keystore & Print SHA-1
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          if [ ! -f debug.keystore ]; then
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > debug.keystore
+            echo "Loaded permanent keystore from GitHub Secrets."
+          elif [ ! -f debug.keystore ]; then
             keytool -genkey -v -keystore debug.keystore \
               -storepass android -alias androiddebugkey -keypass android \
               -keyalg RSA -keysize 2048 -validity 10000 \
               -dname "CN=Android Debug,O=Android,C=US"
+            echo "=== BASE64 KEYSTORE (Optional: Save as KEYSTORE_BASE64 secret to lock SHA-1 forever) ==="
+            base64 -w 0 debug.keystore
+            echo ""
           fi
+          echo "=== COPY THIS SHA-1 FOR GOOGLE CLOUD CONSOLE ==="
+          keytool -list -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android | grep "SHA1:"
+          echo "=== YOUR PACKAGE NAME (applicationId) ==="
+          grep -E "applicationId|namespace" app/build.gradle.kts
 
       - name: Inject API keys & default_web_client_id
         env:
