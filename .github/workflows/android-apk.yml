@@ -32,16 +32,18 @@ jobs:
           DRIVE_API_KEY: ${{ secrets.DRIVE_API_KEY }}
           WEB_CLIENT_ID: ${{ secrets.WEB_CLIENT_ID }}
         run: |
-          echo "GOOGLE_DRIVE_API_KEY=$DRIVE_API_KEY" >> local.properties
-          echo "DRIVE_API_KEY=$DRIVE_API_KEY" >> .env
+          CLIENT_ID="${WEB_CLIENT_ID}"
+          if [ -z "$CLIENT_ID" ]; then
+            CLIENT_ID="://googleusercontent.com"
+          fi
+          API_KEY="${DRIVE_API_KEY}"
+          if [ -z "$API_KEY" ]; then
+            API_KEY="placeholder"
+          fi
+          printf "GOOGLE_DRIVE_API_KEY=%s\n" "$API_KEY" >> local.properties
+          printf "DRIVE_API_KEY=%s\n" "$API_KEY" >> .env
           mkdir -p app/src/main/res/values
-          cat << EOF > app/src/main/res/values/ci_secrets.xml
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <string name="default_web_client_id" translatable="false">${WEB_CLIENT_ID:://googleusercontent.com}</string>
-              <string name="google_drive_api_key" translatable="false">${DRIVE_API_KEY:-placeholder}</string>
-          </resources>
-          EOF
+          printf '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="default_web_client_id" translatable="false">%s</string>\n    <string name="google_drive_api_key" translatable="false">%s</string>\n</resources>\n' "$CLIENT_ID" "$API_KEY" > app/src/main/res/values/ci_secrets.xml
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
