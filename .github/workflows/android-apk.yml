@@ -33,32 +33,42 @@ jobs:
               -storepass android -alias androiddebugkey -keypass android \
               -keyalg RSA -keysize 2048 -validity 10000 \
               -dname "CN=Android Debug,O=Android,C=US"
-            echo "=== BASE64 KEYSTORE (Optional: Save as KEYSTORE_BASE64 secret to lock SHA-1 forever) ==="
+            echo "=== BASE64 KEYSTORE ==="
             base64 -w 0 debug.keystore
             echo ""
           fi
-          echo "=== COPY THIS SHA-1 FOR GOOGLE CLOUD CONSOLE ==="
+          echo "=== SHA-1 FINGERPRINT ==="
           keytool -list -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android | grep "SHA1:"
-          echo "=== YOUR PACKAGE NAME (applicationId) ==="
-          grep -E "applicationId|namespace" app/build.gradle.kts
 
       - name: Inject API keys & default_web_client_id
         env:
-          DRIVE_API_KEY: ${{ secrets.DRIVE_API_KEY }}
           WEB_CLIENT_ID: ${{ secrets.WEB_CLIENT_ID }}
+          GOOGLE_DRIVE_API_KEY: ${{ secrets.GOOGLE_DRIVE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: |
           CLIENT_ID="${WEB_CLIENT_ID}"
-          if [ -z "$CLIENT_ID" ]; then
-            CLIENT_ID="://googleusercontent.com"
-          fi
-          API_KEY="${DRIVE_API_KEY}"
-          if [ -z "$API_KEY" ]; then
-            API_KEY="placeholder"
-          fi
-          printf "GOOGLE_DRIVE_API_KEY=%s\n" "$API_KEY" >> local.properties
-          printf "DRIVE_API_KEY=%s\n" "$API_KEY" >> .env
+          if [ -z "$CLIENT_ID" ]; then CLIENT_ID="://googleusercontent.com"; fi
+
+          DRIVE_KEY="${GOOGLE_DRIVE_API_KEY}"
+          if [ -z "$DRIVE_KEY" ]; then DRIVE_KEY="placeholder"; fi
+
+          GEMINI_KEY="${GEMINI_API_KEY}"
+          if [ -z "$GEMINI_KEY" ]; then GEMINI_KEY="placeholder"; fi
+
+          MAPS_KEY="${MAPS_API_KEY}"
+          if [ -z "$MAPS_KEY" ]; then MAPS_KEY="placeholder"; fi
+
+          printf "GOOGLE_DRIVE_API_KEY=%s\n" "$DRIVE_KEY" >> local.properties
+          printf "GEMINI_API_KEY=%s\n" "$GEMINI_KEY" >> local.properties
+          printf "MAPS_API_KEY=%s\n" "$MAPS_KEY" >> local.properties
+
+          printf "GOOGLE_DRIVE_API_KEY=%s\n" "$DRIVE_KEY" >> .env
+          printf "GEMINI_API_KEY=%s\n" "$GEMINI_KEY" >> .env
+          printf "MAPS_API_KEY=%s\n" "$MAPS_KEY" >> .env
+
           mkdir -p app/src/main/res/values
-          printf '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="default_web_client_id" translatable="false">%s</string>\n    <string name="google_drive_api_key" translatable="false">%s</string>\n</resources>\n' "$CLIENT_ID" "$API_KEY" > app/src/main/res/values/ci_secrets.xml
+          printf '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="default_web_client_id" translatable="false">%s</string>\n    <string name="google_drive_api_key" translatable="false">%s</string>\n    <string name="gemini_api_key" translatable="false">%s</string>\n    <string name="google_maps_key" translatable="false">%s</string>\n</resources>\n' "$CLIENT_ID" "$DRIVE_KEY" "$GEMINI_KEY" "$MAPS_KEY" > app/src/main/res/values/ci_secrets.xml
 
       - name: Auto-increment App Version
         run: |
