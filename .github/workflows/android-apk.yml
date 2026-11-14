@@ -5,6 +5,9 @@ on:
   push:
     branches: [ main, master ]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -45,6 +48,16 @@ jobs:
           mkdir -p app/src/main/res/values
           printf '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="default_web_client_id" translatable="false">%s</string>\n    <string name="google_drive_api_key" translatable="false">%s</string>\n</resources>\n' "$CLIENT_ID" "$API_KEY" > app/src/main/res/values/ci_secrets.xml
 
+      - name: Auto-increment App Version
+        run: |
+          BUILD_NUM=${{ github.run_number }}
+          VERSION_NAME="1.0.${BUILD_NUM}"
+          echo "VERSION_NAME=${VERSION_NAME}" >> $GITHUB_ENV
+          if [ -f app/build.gradle.kts ]; then
+            sed -i -E "s/versionCode\s*=\s*[0-9]+/versionCode = ${BUILD_NUM}/g" app/build.gradle.kts
+            sed -i -E "s/versionName\s*=\s*\"[^\"]+\"/versionName = \"${VERSION_NAME}\"/g" app/build.gradle.kts
+          fi
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -53,8 +66,22 @@ jobs:
       - name: Build Debug APK
         run: gradle assembleDebug -Djava.awt.headless=true
 
-      - name: Upload APK
+      - name: Rename APK with Version
+        run: |
+          APK_FILE=$(find app/build/outputs/apk -name "*.apk" | head -n 1)
+          mkdir -p release-apk
+          cp "$APK_FILE" "release-apk/YVGPSCAM-v${VERSION_NAME}.apk"
+
+      - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: YVGPSCAM-v${{ env.VERSION_NAME }}
+          path: release-apk/*.apk
+
+      - name: Publish Direct APK to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION_NAME }}
+          name: YVGPSCAM v${{ env.VERSION_NAME }}
+          body: "Automated APK build from Google AI Studio push (Commit: ${{ github.sha }})."
+          files: release-apk/*.apk
